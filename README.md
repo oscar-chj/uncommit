@@ -8,7 +8,7 @@ When "vibe coding" with AI assistance, you accumulate many uncommitted changes t
 
 ## The Solution
 
-Uncommit uses an AI agent (Google ADK + Gemini) to:
+Uncommit uses Gemini to:
 1. **Analyze** your uncommitted changes
 2. **Understand** the intent of each change
 3. **Group** related changes into logical commit bundles
@@ -22,7 +22,7 @@ git clone https://github.com/yourusername/uncommit.git
 cd uncommit
 
 # Install with uv (recommended)
-uv pip install -e .
+uv sync
 
 # Or with pip
 pip install -e .
@@ -30,18 +30,16 @@ pip install -e .
 
 ## Setup
 
-Set your Google API key:
+Get a Google API key from [AI Studio](https://aistudio.google.com/apikey) and set it:
 
 ```bash
 export GOOGLE_API_KEY="your-api-key-here"
 ```
 
-Or create a config file at `~/.config/uncommit/config.toml`:
+Or create `.env.local` in your project:
 
-```toml
-[default]
-model = "gemini-2.0-flash"
-api_key = "your-api-key-here"
+```
+GOOGLE_API_KEY=your-api-key-here
 ```
 
 ## Usage
@@ -49,56 +47,34 @@ api_key = "your-api-key-here"
 ### Analyze your changes
 
 ```bash
-# See what files have uncommitted changes
-uncommit analyze
-
-# Output as JSON
-uncommit analyze --json
+uncommit analyze          # List uncommitted files
+uncommit analyze --json   # Output as JSON
 ```
 
 ### Get AI suggestions
 
 ```bash
-# Let AI suggest how to group your changes
-uncommit suggest
-
-# Preview without caching (dry run)
-uncommit suggest --dry-run
-
-# Use a different model
-uncommit suggest --model gemini-1.5-pro
+uncommit suggest              # Group changes into commits
+uncommit suggest --dry-run    # Preview without caching
+uncommit suggest --model gemini-1.5-pro  # Use different model
 ```
 
 ### Commit the groups
 
 ```bash
-# Commit a specific group by index
-uncommit commit 1
-
-# Commit all groups in order
-uncommit commit --all
-
-# Override the commit message
-uncommit commit 1 --message "custom: my own message"
+uncommit commit 1             # Commit group #1
+uncommit commit --all         # Commit all groups
+uncommit commit 1 -m "custom" # Override message
 ```
 
 ### Other commands
 
 ```bash
-# Show cached suggestions without re-running AI
-uncommit status
-
-# Undo the last commit (keeps changes in working directory)
-uncommit undo
-
-# Undo and discard changes (dangerous!)
-uncommit undo --hard
-
-# Clear cached suggestions
-uncommit clear
-
-# Help
-uncommit --help
+uncommit status       # Show cached suggestions
+uncommit undo         # Undo last commit (keep changes)
+uncommit undo --soft  # Undo, keep changes staged
+uncommit undo --hard  # Undo and discard (dangerous!)
+uncommit clear        # Clear cached suggestions
 ```
 
 ## Example Session
@@ -106,7 +82,7 @@ uncommit --help
 ```bash
 $ uncommit suggest
 
-🔍 Analyzing 5 changed files...
+⠋ Analyzing 5 changed files...
 
 📦 Proposed Commits
 
@@ -119,13 +95,6 @@ $ uncommit suggest
       └─ src/parser.py
       Reason: Isolated bugfix in parser module
 
-  [3] refactor: clean up unused imports
-      └─ src/utils.py
-      └─ src/helpers.py
-      Reason: Related cleanup across utility modules
-
-Use 'uncommit commit <index>' to commit a group, or 'uncommit commit --all' for all.
-
 $ uncommit commit 1
 ✓ Committed: feat: add user authentication (abc1234)
 
@@ -133,10 +102,24 @@ $ uncommit commit 2
 ✓ Committed: fix: resolve null pointer in parser (def5678)
 ```
 
+## Development
+
+```bash
+# Install with dev dependencies
+uv sync --dev
+
+# Run tests
+uv run pytest
+
+# Or activate venv and run directly
+source .venv/Scripts/activate  # Windows
+pytest
+```
+
 ## Requirements
 
 - Python 3.11+
-- A Google API key with access to Gemini models
+- Google API key ([get one here](https://aistudio.google.com/apikey))
 - A git repository with uncommitted changes
 
 ## License

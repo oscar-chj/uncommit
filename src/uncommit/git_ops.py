@@ -103,7 +103,7 @@ def _get_diff_status(diff) -> str:
         return "added"
     elif diff.deleted_file:
         return "deleted"
-    elif diff.renamed:
+    elif diff.renamed_file:
         return "renamed"
     else:
         return "modified"
