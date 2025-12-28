@@ -25,6 +25,8 @@ from uncommit.git_ops import (
     unstage_all,
     GitError,
     get_repo_root,
+    get_last_commit,
+    undo_last_commit,
 )
 from uncommit.models import CommitGroup, SuggestionResult
 
@@ -246,13 +248,37 @@ def suggest(
         result = SuggestionResult(**result_data)
 
     except ImportError as e:
-        _print_error(f"Failed to import ADK components: {e}\nMake sure google-adk is installed: pip install google-adk")
+        _print_error(f"Failed to import google-genai: {e}\nInstall with: pip install google-genai")
         return
     except json.JSONDecodeError as e:
-        _print_error(f"Failed to parse agent response as JSON: {e}")
+        _print_error(f"AI returned invalid JSON. Try running again.\nDetails: {e}")
         return
     except Exception as e:
-        _print_error(f"Agent error: {e}")
+        error_msg = str(e).lower()
+        
+        # Provide specific helpful messages for common errors
+        if "api_key" in error_msg or "api key" in error_msg or "unauthorized" in error_msg:
+            _print_error(
+                "Invalid or missing API key.\n"
+                "  1. Get a key at: https://aistudio.google.com/apikey\n"
+                "  2. Set it: export GOOGLE_API_KEY='your-key'"
+            )
+        elif "quota" in error_msg or "rate" in error_msg or "limit" in error_msg:
+            _print_error(
+                "API rate limit exceeded. Please wait a moment and try again.\n"
+                "  Tip: Use a different model with --model gemini-1.5-flash"
+            )
+        elif "network" in error_msg or "connection" in error_msg or "timeout" in error_msg:
+            _print_error(
+                "Network error. Check your internet connection and try again."
+            )
+        elif "model" in error_msg and ("not found" in error_msg or "invalid" in error_msg):
+            _print_error(
+                f"Model not found. Try: uncommit suggest --model gemini-2.0-flash\n"
+                f"  Details: {e}"
+            )
+        else:
+            _print_error(f"AI error: {e}")
         return
 
     # Cache results unless dry-run
@@ -377,6 +403,65 @@ def clear() -> None:
     """Clear cached suggestions."""
     _clear_cache()
     _print_success("Cached suggestions cleared")
+
+
+@app.command()
+def status() -> None:
+    """Show cached suggestions without re-running AI."""
+    cached = _load_cached_suggestions()
+    
+    if cached is None:
+        console.print("[yellow]No cached suggestions. Run 'uncommit suggest' first.[/yellow]")
+        return
+    
+    if not cached.groups:
+        console.print("[yellow]All groups have been committed. Run 'uncommit suggest' to analyze new changes.[/yellow]")
+        _clear_cache()
+        return
+    
+    _print_suggestions(cached)
+
+
+@app.command()
+def undo(
+    hard: bool = typer.Option(False, "--hard", help="Discard changes completely (dangerous!)"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+) -> None:
+    """Undo the last commit (keeps changes by default)."""
+    try:
+        repo = get_repo()
+        last = get_last_commit(repo)
+    except GitError as e:
+        _print_error(str(e))
+        return
+    
+    if last is None:
+        _print_error("No commits to undo")
+        return
+    
+    # Show what will be undone
+    console.print(f"\n[yellow]Last commit:[/yellow] {last.hash} {last.message}")
+    
+    if hard:
+        console.print("[red]⚠ WARNING: --hard will PERMANENTLY DISCARD all changes![/red]")
+    else:
+        console.print("[dim]Changes will be kept in your working directory.[/dim]")
+    
+    # Confirm unless --yes
+    if not yes:
+        confirm = typer.confirm("\nUndo this commit?")
+        if not confirm:
+            console.print("[dim]Cancelled.[/dim]")
+            return
+    
+    try:
+        undone = undo_last_commit(repo, keep_changes=not hard)
+        _print_success(f"Undone: {undone.message} ({undone.hash})")
+        
+        if not hard:
+            console.print("[dim]Changes are now unstaged. Use 'uncommit suggest' to re-analyze.[/dim]")
+    except GitError as e:
+        _print_error(str(e))
 
 
 def main() -> None:

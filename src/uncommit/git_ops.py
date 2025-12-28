@@ -285,3 +285,54 @@ def unstage_all(repo: Repo) -> None:
     except Exception:
         # Ignore errors, repo might be in an unusual state
         pass
+
+
+def get_last_commit(repo: Repo) -> CommitInfo | None:
+    """Get info about the most recent commit.
+    
+    Args:
+        repo: The git Repo object.
+    
+    Returns:
+        CommitInfo for the last commit, or None if no commits exist.
+    """
+    try:
+        commit = repo.head.commit
+        return CommitInfo(
+            hash=commit.hexsha[:7],
+            message=commit.message.strip().split("\n")[0],
+            author=commit.author.name,
+            date=commit.committed_datetime.isoformat(),
+        )
+    except (ValueError, TypeError):
+        return None
+
+
+def undo_last_commit(repo: Repo, keep_changes: bool = True) -> CommitInfo:
+    """Undo the last commit.
+    
+    Args:
+        repo: The git Repo object.
+        keep_changes: If True, keep the changes in working directory (soft reset).
+                     If False, discard changes completely (hard reset).
+    
+    Returns:
+        CommitInfo of the undone commit.
+    
+    Raises:
+        GitError: If there's no commit to undo or the operation fails.
+    """
+    last_commit = get_last_commit(repo)
+    if last_commit is None:
+        raise GitError("No commits to undo")
+    
+    try:
+        if keep_changes:
+            # Soft reset: undo commit but keep changes staged
+            repo.git.reset("--soft", "HEAD~1")
+        else:
+            # Hard reset: undo commit and discard all changes
+            repo.git.reset("--hard", "HEAD~1")
+        return last_commit
+    except Exception as e:
+        raise GitError(f"Failed to undo commit: {e}")
