@@ -424,10 +424,15 @@ def status() -> None:
 
 @app.command()
 def undo(
+    soft: bool = typer.Option(False, "--soft", help="Keep changes staged (git reset --soft)"),
     hard: bool = typer.Option(False, "--hard", help="Discard changes completely (dangerous!)"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ) -> None:
-    """Undo the last commit (keeps changes by default)."""
+    """Undo the last commit (keeps changes unstaged by default)."""
+    if soft and hard:
+        _print_error("Cannot use both --soft and --hard")
+        return
+    
     try:
         repo = get_repo()
         last = get_last_commit(repo)
@@ -444,8 +449,10 @@ def undo(
     
     if hard:
         console.print("[red]⚠ WARNING: --hard will PERMANENTLY DISCARD all changes![/red]")
+    elif soft:
+        console.print("[dim]Changes will be kept staged (ready to commit).[/dim]")
     else:
-        console.print("[dim]Changes will be kept in your working directory.[/dim]")
+        console.print("[dim]Changes will be kept in your working directory (unstaged).[/dim]")
     
     # Confirm unless --yes
     if not yes:
@@ -455,11 +462,21 @@ def undo(
             return
     
     try:
-        undone = undo_last_commit(repo, keep_changes=not hard)
+        # Determine reset mode
+        if hard:
+            mode = "hard"
+        elif soft:
+            mode = "soft"
+        else:
+            mode = "mixed"
+        
+        undone = undo_last_commit(repo, mode=mode)
         _print_success(f"Undone: {undone.message} ({undone.hash})")
         
-        if not hard:
-            console.print("[dim]Changes are now unstaged. Use 'uncommit suggest' to re-analyze.[/dim]")
+        if soft:
+            console.print("[dim]Changes are staged. Use 'git commit' to recommit.[/dim]")
+        elif not hard:
+            console.print("[dim]Changes are unstaged. Use 'uncommit suggest' to re-analyze.[/dim]")
     except GitError as e:
         _print_error(str(e))
 

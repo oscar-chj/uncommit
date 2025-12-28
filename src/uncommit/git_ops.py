@@ -308,13 +308,12 @@ def get_last_commit(repo: Repo) -> CommitInfo | None:
         return None
 
 
-def undo_last_commit(repo: Repo, keep_changes: bool = True) -> CommitInfo:
+def undo_last_commit(repo: Repo, mode: str = "mixed") -> CommitInfo:
     """Undo the last commit.
     
     Args:
         repo: The git Repo object.
-        keep_changes: If True, keep the changes in working directory (soft reset).
-                     If False, discard changes completely (hard reset).
+        mode: Reset mode - "soft" (keep staged), "mixed" (keep unstaged), "hard" (discard).
     
     Returns:
         CommitInfo of the undone commit.
@@ -327,12 +326,15 @@ def undo_last_commit(repo: Repo, keep_changes: bool = True) -> CommitInfo:
         raise GitError("No commits to undo")
     
     try:
-        if keep_changes:
-            # Soft reset: undo commit but keep changes staged
+        if mode == "soft":
+            # Soft reset: undo commit, keep changes staged
             repo.git.reset("--soft", "HEAD~1")
-        else:
+        elif mode == "hard":
             # Hard reset: undo commit and discard all changes
             repo.git.reset("--hard", "HEAD~1")
+        else:
+            # Mixed reset (default): undo commit, keep changes unstaged
+            repo.git.reset("HEAD~1")
         return last_commit
     except Exception as e:
         raise GitError(f"Failed to undo commit: {e}")
