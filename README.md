@@ -85,6 +85,15 @@ uncommit commit 1 --message "custom: my own message"
 ### Other commands
 
 ```bash
+# Show cached suggestions without re-running AI
+uncommit status
+
+# Undo the last commit (keeps changes in working directory)
+uncommit undo
+
+# Undo and discard changes (dangerous!)
+uncommit undo --hard
+
 # Clear cached suggestions
 uncommit clear
 
