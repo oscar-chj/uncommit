@@ -137,11 +137,10 @@ def analyze(
 
         console.print(table)
 
-
 async def _run_agent_async(changes: list, model_override: str | None, config_model: str) -> str:
-    """Run the agent using google-genai directly for more reliable CLI usage."""
+    """Run the Gemini model to analyze changes."""
     import google.genai as genai
-    from uncommit.agent import root_agent
+    from uncommit.agent import SYSTEM_PROMPT, DEFAULT_MODEL
     from uncommit.config import load_config
     
     # Get API key
@@ -151,7 +150,7 @@ async def _run_agent_async(changes: list, model_override: str | None, config_mod
     client = genai.Client(api_key=config.api_key)
     
     # Determine model
-    model_name = model_override or config_model or "gemini-2.0-flash"
+    model_name = model_override or config_model or DEFAULT_MODEL
     
     # Build the file list as context
     file_list = "\n".join([f"- {c.path} ({c.status})" for c in changes])
@@ -180,7 +179,7 @@ async def _run_agent_async(changes: list, model_override: str | None, config_mod
 ## Diffs
 {diff_context}
 
-{root_agent.instruction}"""
+{SYSTEM_PROMPT}"""
     
     # Call the model
     response = await client.aio.models.generate_content(
