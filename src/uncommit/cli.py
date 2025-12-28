@@ -138,10 +138,11 @@ def analyze(
         console.print(table)
 
 async def _run_agent_async(changes: list, model_override: str | None, config_model: str) -> str:
-    """Run the Gemini model to analyze changes."""
+    """Run the Gemini model to analyze changes with area context."""
     import google.genai as genai
     from uncommit.agent import SYSTEM_PROMPT, DEFAULT_MODEL
     from uncommit.config import load_config
+    from uncommit.context import get_context_for_changes
     
     # Get API key
     config = load_config()
@@ -151,6 +152,10 @@ async def _run_agent_async(changes: list, model_override: str | None, config_mod
     
     # Determine model
     model_name = model_override or config_model or DEFAULT_MODEL
+    
+    # Get area context for the changed files
+    changed_paths = [c.path for c in changes]
+    area_context = await get_context_for_changes(changed_paths, config.api_key, model_name)
     
     # Build the file list as context
     file_list = "\n".join([f"- {c.path} ({c.status})" for c in changes])
@@ -170,8 +175,11 @@ async def _run_agent_async(changes: list, model_override: str | None, config_mod
     
     diff_context = "\n\n".join(diffs)
     
-    # Build the full prompt
+    # Build the full prompt with area context
     prompt = f"""Analyze these uncommitted git changes and group them into logical commits.
+
+## Project Context
+{area_context}
 
 ## Changed Files
 {file_list}
@@ -478,6 +486,47 @@ def undo(
             console.print("[dim]Changes are unstaged. Use 'uncommit suggest' to re-analyze.[/dim]")
     except GitError as e:
         _print_error(str(e))
+
+@app.command()
+def init(
+    force: bool = typer.Option(False, "--force", "-f", help="Regenerate all areas even if fresh"),
+) -> None:
+    """Initialize or refresh area documentation for better context.
+    
+    This pre-generates documentation about each area of your codebase,
+    which helps uncommit make smarter commit grouping decisions.
+    """
+    from uncommit.context import get_all_areas, is_area_stale, generate_area_doc
+    
+    config = load_config()
+    if not config.api_key:
+        _print_error(
+            "GOOGLE_API_KEY not set. Please set it in your environment or config file.\n"
+            "  export GOOGLE_API_KEY='your-api-key'"
+        )
+        return
+    
+    areas = get_all_areas()
+    
+    console.print(f"\n[cyan]Found {len(areas)} areas:[/cyan] {', '.join(areas)}\n")
+    
+    regenerated = 0
+    for area in areas:
+        stale = is_area_stale(area)
+        
+        if stale or force:
+            with console.status(f"[cyan]Generating docs for {area}...[/cyan]"):
+                try:
+                    asyncio.run(generate_area_doc(area, config.api_key, config.model or "gemini-2.0-flash"))
+                    _print_success(f"Generated: {area}")
+                    regenerated += 1
+                except Exception as e:
+                    _print_error(f"Failed to generate {area}: {e}")
+        else:
+            console.print(f"[dim]Cached: {area}[/dim]")
+    
+    console.print(f"\n[green]Done![/green] Regenerated {regenerated}/{len(areas)} area docs.")
+    console.print("[dim]Docs saved to .uncommit/areas/[/dim]")
 
 
 def main() -> None:

@@ -1,4 +1,4 @@
-"""Prompt configuration for the commit analyzer."""
+"""Prompt configuration for the Gemini commit analyzer."""
 
 # The system prompt for the Gemini model
 # This defines how the AI should analyze and group git changes

@@ -5,6 +5,7 @@ __pycache__/
 
 # Uncommit cache
 .uncommit_cache.json
+.uncommit/
 
 # C extensions
 *.so
