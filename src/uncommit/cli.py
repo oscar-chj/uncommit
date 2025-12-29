@@ -506,11 +506,14 @@ def init(
         )
         return
     
-    areas = get_all_areas()
+    with console.status("[cyan]Scanning for areas...[/cyan]"):
+        areas = get_all_areas()
     
     console.print(f"\n[cyan]Found {len(areas)} areas:[/cyan] {', '.join(areas)}\n")
     
     regenerated = 0
+    cached = 0
+    
     for area in areas:
         stale = is_area_stale(area)
         
@@ -523,10 +526,36 @@ def init(
                 except Exception as e:
                     _print_error(f"Failed to generate {area}: {e}")
         else:
-            console.print(f"[dim]Cached: {area}[/dim]")
+            with console.status(f"[dim]Loading {area}...[/dim]"):
+                pass  # Just show loading briefly
+            console.print(f"[dim]✓ Cached: {area}[/dim]")
+            cached += 1
     
-    console.print(f"\n[green]Done![/green] Regenerated {regenerated}/{len(areas)} area docs.")
+    console.print(f"\n[green]Done![/green] {cached} cached, {regenerated} regenerated.")
     console.print("[dim]Docs saved to .uncommit/areas/[/dim]")
+
+
+@app.command()
+def reset() -> None:
+    """Clear all cached area documentation.
+    
+    Run 'uncommit init' after this to regenerate fresh docs.
+    """
+    from uncommit.context import get_uncommit_dir
+    import shutil
+    
+    uncommit_dir = get_uncommit_dir()
+    areas_dir = uncommit_dir / "areas"
+    
+    if areas_dir.exists():
+        shutil.rmtree(areas_dir)
+        _print_success("Area docs cleared")
+    else:
+        console.print("[yellow]No area docs to clear[/yellow]")
+    
+    # Also clear the suggestions cache
+    _clear_cache()
+    console.print("[dim]Run 'uncommit init' to regenerate area docs[/dim]")
 
 
 def main() -> None:
