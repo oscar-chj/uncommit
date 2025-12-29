@@ -53,4 +53,5 @@ jobs:
         run: |
           python -c "from uncommit.cli import app; print('CLI imports OK')"
           python -c "from uncommit.git_ops import get_repo; print('Git ops imports OK')"
-          python -c "from uncommit.agent import root_agent; print('Agent imports OK')"
+          python -c "from uncommit.agent import SYSTEM_PROMPT; print('Agent imports OK')"
+          python -c "from uncommit.context import get_all_areas; print('Context imports OK')"

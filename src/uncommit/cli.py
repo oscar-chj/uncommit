@@ -189,13 +189,34 @@ async def _run_agent_async(changes: list, model_override: str | None, config_mod
 
 {SYSTEM_PROMPT}"""
     
-    # Call the model
-    response = await client.aio.models.generate_content(
-        model=model_name,
-        contents=prompt,
-    )
+    # Call the model with retry logic
+    import time
+    max_retries = 3
+    last_error = None
     
-    return response.text
+    for attempt in range(max_retries):
+        try:
+            response = await client.aio.models.generate_content(
+                model=model_name,
+                contents=prompt,
+            )
+            return response.text
+        except Exception as e:
+            last_error = e
+            error_str = str(e).lower()
+            
+            # Don't retry for auth errors
+            if "api_key" in error_str or "invalid" in error_str or "401" in error_str:
+                raise
+            
+            # Retry for rate limits and transient errors
+            if attempt < max_retries - 1:
+                wait_time = (2 ** attempt) + 1  # 2s, 3s, 5s
+                time.sleep(wait_time)
+            else:
+                raise
+    
+    raise last_error
 
 
 @app.command()
@@ -346,6 +367,7 @@ def commit(
     group_index: Optional[int] = typer.Argument(None, help="Index of the group to commit (1-based)"),
     all_groups: bool = typer.Option(False, "--all", "-a", help="Commit all groups sequentially"),
     message: Optional[str] = typer.Option(None, "--message", "-m", help="Override commit message"),
+    interactive: bool = typer.Option(False, "--interactive", "-i", help="Prompt before each commit"),
 ) -> None:
     """Commit a specific group or all groups."""
     cached_suggestions = _load_cached_suggestions()
@@ -377,7 +399,19 @@ def commit(
         groups_to_commit = [group]
 
     # Commit each group
+    committed_count = 0
     for group in groups_to_commit:
+        # Interactive mode: show preview and ask for confirmation
+        if interactive:
+            console.print(f"\n[bold]\\[{group.index}][/bold] {group.message}")
+            for file in group.files:
+                console.print(f"    └─ {file}")
+            console.print(f"    [dim]{group.reasoning}[/dim]")
+            
+            if not typer.confirm("\nCommit this group?"):
+                console.print("[dim]Skipped[/dim]")
+                continue
+        
         try:
             # Unstage everything first
             unstage_all(repo)
@@ -390,6 +424,7 @@ def commit(
             commit_hash = create_commit(repo, commit_message)
             
             _print_success(f"Committed: {commit_message} ([cyan]{commit_hash}[/cyan])")
+            committed_count += 1
             
             # Remove this group from cached suggestions and save
             cached_suggestions.groups = [g for g in cached_suggestions.groups if g.index != group.index]
@@ -403,6 +438,8 @@ def commit(
     if not cached_suggestions.groups:
         _clear_cache()
         console.print("\n[green]All groups committed![/green]")
+    elif interactive and committed_count > 0:
+        console.print(f"\n[green]Committed {committed_count} group(s).[/green]")
 
 
 @app.command()

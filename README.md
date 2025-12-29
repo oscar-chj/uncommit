@@ -1,5 +1,9 @@
 # Uncommit
 
+[![Tests](https://github.com/oscar-chj/uncommit/actions/workflows/tests.yml/badge.svg)](https://github.com/oscar-chj/uncommit/actions/workflows/tests.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 **AI-powered commit organizer** — group your messy changes into clean, logical commits.
 
 ## The Problem
@@ -18,7 +22,7 @@ Uncommit uses Gemini to:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/uncommit.git
+git clone https://github.com/oscar-chj/uncommit.git
 cd uncommit
 
 # Install with uv (recommended)
